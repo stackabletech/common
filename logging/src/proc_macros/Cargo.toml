@@ -1,0 +1,18 @@
+[package]
+name = "stackable_logging-proc_macros"
+version = "0.1.0"
+authors = ["Lars Francke <lars.francke@stackable.de>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+path = "mod.rs"
+
+[dependencies]
+proc-macro2 = { version = "1", features = ["nightly"] }
+syn = { version="1", features=["extra-traits"] }
+quote = "1"
+slog = { version = "2", features = ["max_level_trace", "release_max_level_warn"] }
+slog-async = "2"
+slog-term = "2"
+
