@@ -5,3 +5,5 @@ authors = ["Lars Francke <lars.francke@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+bstr = "0.2.12"
+clap = "2.33.3"
