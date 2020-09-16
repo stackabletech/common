@@ -5,7 +5,6 @@ use std::fmt::Error;
 // Include all "stolen" ripgrep code in this module
 mod ripgrep_config;
 
-
 /// This trait defines the behavior that all configuration classes need to
 /// provide in order for the clap matcher to be generated from the config object
 pub trait ConfigDescription {
