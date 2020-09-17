@@ -104,3 +104,71 @@ fn parse_reader<R: io::Read>(rdr: R) -> Result<(Vec<OsString>, Vec<Box<dyn Error
     })?;
     Ok((args, errs))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::parse_reader;
+    use std::ffi::OsString;
+
+    #[test]
+    fn basic() {
+        let (args, errs) = parse_reader(
+            &b"\
+# Test
+--context=0
+   --smart-case
+-u
+
+
+   # --bar
+--foo
+"[..],
+        )
+            .unwrap();
+        assert!(errs.is_empty());
+        let args: Vec<String> =
+            args.into_iter().map(|s| s.into_string().unwrap()).collect();
+        assert_eq!(args, vec!["--context=0", "--smart-case", "-u", "--foo",]);
+    }
+
+    // We test that we can handle invalid UTF-8 on Unix-like systems.
+    #[test]
+    #[cfg(unix)]
+    fn error() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let (args, errs) = parse_reader(
+            &b"\
+quux
+foo\xFFbar
+baz
+"[..],
+        )
+            .unwrap();
+        assert!(errs.is_empty());
+        assert_eq!(
+            args,
+            vec![
+                OsString::from("quux"),
+                OsString::from_vec(b"foo\xFFbar".to_vec()),
+                OsString::from("baz"),
+            ]
+        );
+    }
+
+    // ... but test that invalid UTF-8 fails on Windows.
+    #[test]
+    #[cfg(not(unix))]
+    fn error() {
+        let (args, errs) = parse_reader(
+            &b"\
+quux
+foo\xFFbar
+baz
+"[..],
+        )
+            .unwrap();
+        assert_eq!(errs.len(), 1);
+        assert_eq!(args, vec![OsString::from("quux"), OsString::from("baz"),]);
+    }
+}

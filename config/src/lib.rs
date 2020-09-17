@@ -1,6 +1,7 @@
-use clap::{App, Arg, ArgMatches};
-use std::env;
+use std::ffi::OsString;
 use std::fmt::Error;
+
+use clap::{App, Arg, ArgMatches};
 
 // Include all "stolen" ripgrep code in this module
 mod ripgrep_config;
@@ -24,9 +25,6 @@ pub struct Configuration {
     pub about: &'static str,
     /// the list of all possible command line options
     pub options: Vec<ConfigOption>,
-    /// the name of an environment variable that can be used to specify an
-    /// additional config file
-    pub environment_config: &'static str,
 }
 
 /// Represents an individual config option that the program can interpret
@@ -62,7 +60,12 @@ pub struct ConfigOption {
 /// This effectively means that config can be either provided on the command line, or
 /// in a file that is specified via environment variable, with options from the command
 /// line taking precedence over the config file.
-pub fn get_matcher<'a>(config: &dyn ConfigDescription) -> Result<ArgMatches<'a>, Error> {
+///
+/// * `config` The definition of a config that the matcher will be built from
+/// * `config_file_env` Name of the environment variable to read an extra config file from
+/// * `args` The command line parameters to parse the configuration from (first element will be
+/// ignored, as this is the binary name
+pub fn get_matcher<'a>(config: &dyn ConfigDescription, config_file_env: &str, args: Vec<OsString>) -> Result<ArgMatches<'a>, Error> {
     let configuration = config.get_config();
     let options = &configuration.options;
 
@@ -87,15 +90,15 @@ pub fn get_matcher<'a>(config: &dyn ConfigDescription) -> Result<ArgMatches<'a>,
     // arguments
     let new_matcher = matches.clone();
 
-    // Parse command line arguments
-    let command_line_args = matches.get_matches();
+    // Parse provided arguments
+    let command_line_args = matches.get_matches_from(args.clone());
 
     // If --no-config was passed on the command line, we bypass reading values from the
     // extra config file
     let mut args_from_file = if command_line_args.is_present("no-config") {
         vec![]
     } else {
-        ripgrep_config::args(configuration.environment_config)
+        ripgrep_config::args(config_file_env)
     };
 
     // Check if there were any arguments in the config file
@@ -108,15 +111,136 @@ pub fn get_matcher<'a>(config: &dyn ConfigDescription) -> Result<ArgMatches<'a>,
     // from file by prepending everything from the config file before the
     // command line parameters
     // This way command line params overwrite duplicate options from the config
-    // file because they are parsed later
-    let mut cliargs = env::args_os();
-    if let Some(bin) = cliargs.next() {
-        args_from_file.insert(0, bin);
-    }
+    // file because teey are parsed later
+    let mut cliargs = args;
+
+    // Shift the first element from the actual command line args to the
+    // options that where parsed from the file
+    // This is necessary because the first item in the command line arguments
+    // is the name of the executable and ignored by clap during parsing
+    args_from_file.insert(0, cliargs.remove(0));
     args_from_file.extend(cliargs);
     // TODO: Convert to debug log statement
     println!("final argv: {:?}", args_from_file);
 
     // Return parsed config
     Ok(new_matcher.get_matches_from(args_from_file))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsString;
+
+    use crate::{ConfigDescription, ConfigOption, Configuration, get_matcher};
+    use std::env;
+
+    // Define a test configuration that can be used to run a few tests
+    struct TestConfig {}
+
+    impl TestConfig {
+        pub const TEST_PARAM: ConfigOption = ConfigOption {
+            name: "testparam",
+            default: "",
+            required: false,
+            takes_argument: true,
+            help: "Testhelp",
+            documentation: "Testdoc",
+        };
+        pub const TEST_PARAM2: ConfigOption = ConfigOption {
+            name: "testparam2",
+            default: "2",
+            required: false,
+            takes_argument: true,
+            help: "test2",
+            documentation: "test2",
+        };
+        pub const TEST_SWITCH: ConfigOption = ConfigOption {
+            name: "testswitch",
+            default: "",
+            required: false,
+            takes_argument: false,
+            help: "a switch that can be provided - or not",
+            documentation: "test doc switch",
+        };
+    }
+
+    impl ConfigDescription for TestConfig {
+        fn get_config(&self) -> Configuration {
+            Configuration {
+                name: "Test Tool",
+                version: "0.1",
+                about: "blabla",
+                options: vec![TestConfig::TEST_PARAM, TestConfig::TEST_PARAM2, TestConfig::TEST_SWITCH],
+            }
+        }
+    }
+
+    #[test]
+    fn parse_single_param() {
+        let config = TestConfig {};
+        let command_line_args: Vec<OsString> = vec![OsString::from("filename"), OsString::from("--testparam"), OsString::from("param1")];
+        let matcher = get_matcher(&config, &"Test", command_line_args).expect("unexpected error occurred when parsing parameters");
+
+        assert!(matcher.is_present(TestConfig::TEST_PARAM.name));
+        assert_eq!(matcher.value_of(TestConfig::TEST_PARAM.name).unwrap(), "param1");
+    }
+
+    #[test]
+    fn parse_multiple_params() {
+        let config = TestConfig {};
+        let command_line_args: Vec<OsString> = vec![OsString::from("filename"),
+                                                    OsString::from("--testswitch"),
+                                                    OsString::from("--testparam"), OsString::from("param1"),
+                                                    OsString::from("--testparam2"), OsString::from("param2")];
+        let matcher = get_matcher(&config, &"Test", command_line_args).expect("unexpected error occurred when parsing parameters");
+
+        assert!(matcher.is_present(TestConfig::TEST_PARAM.name));
+        assert_eq!(matcher.value_of(TestConfig::TEST_PARAM.name).unwrap(), "param1");
+
+        assert!(matcher.is_present(TestConfig::TEST_PARAM2.name));
+        assert_eq!(matcher.value_of(TestConfig::TEST_PARAM2.name).unwrap(), "param2");
+
+        assert!(matcher.is_present(TestConfig::TEST_SWITCH.name));
+    }
+
+    #[test]
+    fn parse_from_file_only() {
+        let config = TestConfig {};
+        let command_line_args: Vec<OsString> = vec![OsString::from("filename")];
+
+        env::set_var("CONFIG_FILE", get_absolute_file("resources/test/config1.conf"));
+        let matcher = get_matcher(&config, &"CONFIG_FILE", command_line_args).expect("unexpected error occurred when parsing parameters");
+
+        assert!(matcher.is_present(TestConfig::TEST_PARAM.name));
+        assert_eq!(matcher.value_of(TestConfig::TEST_PARAM.name).unwrap(), "fromfile");
+        assert!(matcher.is_present(TestConfig::TEST_PARAM2.name));
+        assert_eq!(matcher.value_of(TestConfig::TEST_PARAM2.name).unwrap(), "fromfile2");
+    }
+
+    /// This test case specifies the same parameter in a config file and on the command line
+    /// Expected result is that command line parameter overrides the file.
+    /// To ensure the file is not simply ignored a second parameter is loaded from file only.
+    #[test]
+    fn override_value_from_file() {
+        let config = TestConfig {};
+        let command_line_args: Vec<OsString> = vec![OsString::from("filename"),
+                                                    OsString::from("--testparam"), OsString::from("param1")];
+
+        env::set_var("CONFIG_FILE", get_absolute_file("resources/test/config1.conf"));
+        let matcher = get_matcher(&config, &"CONFIG_FILE", command_line_args).expect("unexpected error occurred when parsing parameters");
+
+        assert!(matcher.is_present(TestConfig::TEST_PARAM.name));
+        assert_eq!(matcher.value_of(TestConfig::TEST_PARAM.name).unwrap(), "param1");
+        assert!(matcher.is_present(TestConfig::TEST_PARAM2.name));
+        assert_eq!(matcher.value_of(TestConfig::TEST_PARAM2.name).unwrap(), "fromfile2");
+    }
+
+    /// Convert a filename that is relative to the config crate Cargo.toml file
+    /// to an absolute path by retrieving the CARGO_MANIFEST_DIR environment variable
+    /// and prepending this to the filename
+    ///
+    /// * `filename` - A relative filename (no leading /)
+    fn get_absolute_file(filename: &str) -> String {
+        env!("CARGO_MANIFEST_DIR").to_owned() + &"/" + filename
+    }
 }
