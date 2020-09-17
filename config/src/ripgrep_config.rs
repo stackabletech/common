@@ -124,10 +124,9 @@ mod tests {
 --foo
 "[..],
         )
-            .unwrap();
+        .unwrap();
         assert!(errs.is_empty());
-        let args: Vec<String> =
-            args.into_iter().map(|s| s.into_string().unwrap()).collect();
+        let args: Vec<String> = args.into_iter().map(|s| s.into_string().unwrap()).collect();
         assert_eq!(args, vec!["--context=0", "--smart-case", "-u", "--foo",]);
     }
 
@@ -144,7 +143,7 @@ foo\xFFbar
 baz
 "[..],
         )
-            .unwrap();
+        .unwrap();
         assert!(errs.is_empty());
         assert_eq!(
             args,
@@ -167,7 +166,7 @@ foo\xFFbar
 baz
 "[..],
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(errs.len(), 1);
         assert_eq!(args, vec![OsString::from("quux"), OsString::from("baz"),]);
     }
