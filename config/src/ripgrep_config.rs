@@ -1,12 +1,13 @@
-// The code in this file has in large parts been copied from the ripgrep
-// code located at:
-// https://github.com/BurntSushi/ripgrep/blob/0874aa115c92f102a6ec474944f589667463fcd0/crates/core/config.rs
-
-//  ------------------------
-
-// This module provides routines for reading ripgrep config "rc" files. The
-// primary output of these routines is a sequence of arguments, where each
-// argument corresponds precisely to one shell argument.
+//! The code in this module has in large parts been copied and adapted from the ripgrep
+//! code located at:
+//! https://github.com/BurntSushi/ripgrep/blob/0874aa115c92f102a6ec474944f589667463fcd0/crates/core/config.rs
+//!
+//! The original license for this code is the MIT license, which can be obtained at
+//! https://opensource.org/licenses/MIT
+//!
+//! This module provides routines for reading ripgrep config "rc" files. The
+//! primary output of these routines is a sequence of arguments, where each
+//! argument corresponds precisely to one shell argument.
 
 use std::env;
 use std::error;

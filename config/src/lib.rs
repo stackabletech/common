@@ -1,3 +1,17 @@
+//! This crate provides functionality to parse configuration from command line options and
+//! optionally an external file.
+//!
+//! The configuration handling was heavily inspired by the way that ripgrep handles configuration
+//! and roughly works as follows:
+//! * Options can be specified on the command line
+//! * If an environment variable is passed and the value of that variable contains a filename,
+//! this file will be parsed as if the content had been specified as command line arguments.
+//! Arguments on the command line will take precedence over those loaded from a file.
+//!
+//! Interaction with this module will be using ConfigDescription and Configuration
+//! structs to define the configuration a binary/module needs and then calling get_matcher
+//! to parse the command line.
+//!
 use std::ffi::OsString;
 use std::fmt::Error;
 
@@ -29,18 +43,18 @@ pub struct Configuration {
 
 /// Represents an individual config option that the program can interpret
 pub struct ConfigOption {
-    // the name of the option (without leading --)
+    /// The name of the option (without leading --)
     pub name: &'static str,
-    // default value to use for the option if it is not provided
+    /// Default value to use for the option if it is not provided
     pub default: &'static str,
-    // whether this option has to be provided
+    /// Whether this option has to be provided
     pub required: bool,
-    // if true the option takes a value as argument, if false
-    // the option is a present/missing flag
+    /// If true the option takes a value as argument, if false
+    /// the option is a present/missing flag
     pub takes_argument: bool,
-    // help text to display for the option
+    /// Help text to display for the option
     pub help: &'static str,
-    // longer text to use when generating documentation/website/...
+    /// Longer text to use when generating documentation/website/...
     pub documentation: &'static str,
 }
 
@@ -66,11 +80,11 @@ pub struct ConfigOption {
 /// * `args` The command line parameters to parse the configuration from (first element will be
 /// ignored, as this is the binary name
 pub fn get_matcher<'a>(
-    config: &dyn ConfigDescription,
+    config_description: &dyn ConfigDescription,
     config_file_env: &str,
     args: Vec<OsString>,
 ) -> Result<ArgMatches<'a>, Error> {
-    let configuration = config.get_config();
+    let configuration = config_description.get_config();
     let options = &configuration.options;
 
     let mut matches = App::new(configuration.name)
@@ -191,7 +205,7 @@ mod tests {
             OsString::from("--testparam"),
             OsString::from("param1"),
         ];
-        let matcher = get_matcher(&config, &"Test", command_line_args)
+        let matcher = get_matcher(&config, "Test", command_line_args)
             .expect("unexpected error occurred when parsing parameters");
 
         assert!(matcher.is_present(TestConfig::TEST_PARAM.name));
@@ -212,7 +226,7 @@ mod tests {
             OsString::from("--testparam2"),
             OsString::from("param2"),
         ];
-        let matcher = get_matcher(&config, &"Test", command_line_args)
+        let matcher = get_matcher(&config, "Test", command_line_args)
             .expect("unexpected error occurred when parsing parameters");
 
         assert!(matcher.is_present(TestConfig::TEST_PARAM.name));
@@ -239,7 +253,7 @@ mod tests {
             "CONFIG_FILE",
             get_absolute_file("resources/test/config1.conf"),
         );
-        let matcher = get_matcher(&config, &"CONFIG_FILE", command_line_args)
+        let matcher = get_matcher(&config, "CONFIG_FILE", command_line_args)
             .expect("unexpected error occurred when parsing parameters");
 
         assert!(matcher.is_present(TestConfig::TEST_PARAM.name));
@@ -270,7 +284,7 @@ mod tests {
             "CONFIG_FILE",
             get_absolute_file("resources/test/config1.conf"),
         );
-        let matcher = get_matcher(&config, &"CONFIG_FILE", command_line_args)
+        let matcher = get_matcher(&config, "CONFIG_FILE", command_line_args)
             .expect("unexpected error occurred when parsing parameters");
 
         assert!(matcher.is_present(TestConfig::TEST_PARAM.name));
@@ -291,6 +305,6 @@ mod tests {
     ///
     /// * `filename` - A relative filename (no leading /)
     fn get_absolute_file(filename: &str) -> String {
-        env!("CARGO_MANIFEST_DIR").to_owned() + &"/" + filename
+        env!("CARGO_MANIFEST_DIR").to_owned() + "/" + filename
     }
 }
