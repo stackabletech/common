@@ -27,10 +27,7 @@ impl Parse for Log {
         input.parse::<Token![,]>()?;
         let msg = input.parse()?;
 
-        Ok(Log {
-            code,
-            msg,
-        })
+        Ok(Log { code, msg })
     }
 }
 
@@ -56,22 +53,19 @@ pub fn gen_log_error(input: TokenStream) -> TokenStream {
 
 // This is the function that takes incoming tokens and generates the new macro
 fn gen_log_macro(input: TokenStream, severity: &str) -> TokenStream {
-    let Log {
-        code,
-        msg
-    } = parse_macro_input!(input as Log);
+    let Log { code, msg } = parse_macro_input!(input as Log);
 
     /* TODO: I believe we can generate a map at compile time which includes all error codes used so far
-       That way we could abort here with a nice message if the code has been reused
-       instead of doing it later in the compilation process */
+    That way we could abort here with a nice message if the code has been reused
+    instead of doing it later in the compilation process */
     let code = match &code.lit {
         Lit::Int(code) => code,
-        _ => panic!("[code] needs to be a number")
+        _ => panic!("[code] needs to be a number"),
     };
 
     let msg = match &msg.lit {
         Lit::Str(msg) => msg,
-        _ => panic!("[msg] needs to be a string literal")
+        _ => panic!("[msg] needs to be a string literal"),
     };
 
     // This needs to be formatted outside of the quote! macro because the macro will not

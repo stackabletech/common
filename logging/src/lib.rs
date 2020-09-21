@@ -15,16 +15,16 @@ pub use proc_macros::gen_log_error;
 #[doc(hidden)]
 pub use ::slog; /* hide from doc since we just need it for the generated macro */
 
-pub use ::slog::trace;
 pub use ::slog::debug;
 pub use ::slog::info;
+pub use ::slog::trace;
 pub use ::slog::warn;
 
 use slog::Logger;
 use sloggers::{
-    terminal::{TerminalLoggerBuilder, Destination},
+    terminal::{Destination, TerminalLoggerBuilder},
     types::Severity,
-    Build
+    Build,
 };
 
 /// This returns a `slog` `Logger` instance which will print to stdout
@@ -34,7 +34,9 @@ pub fn build_terminal_logger() -> Logger {
     builder.level(Severity::Debug);
     builder.destination(Destination::Stdout);
 
-    return builder.build().expect("Creating the Logger failed, this should not happen; aborting");
+    return builder
+        .build()
+        .expect("Creating the Logger failed, this should not happen; aborting");
 }
 
 #[cfg(test)]
