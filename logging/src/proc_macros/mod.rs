@@ -42,7 +42,7 @@ impl Parse for Log {
 /// * A string literal (same syntax as the built in `format!` macro
 ///
 /// This will generate a new macro which accepts (in this case) two parameters:
-/// ```log_error_1000!(logger, how="fabulous");
+/// ```log_error_1000!(logger, how="fabulous");```
 ///
 /// The first parameter must be an instance of slog's `Logger` trait, the remaining parameters need to be the template variables.
 /// If they are not provided it will result in a compile-time error.
