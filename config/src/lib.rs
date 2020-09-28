@@ -96,6 +96,7 @@ pub fn get_matcher<'a>(
             Arg::with_name(option.name)
                 .long(option.name)
                 .value_name(option.name)
+                .default_value(option.default)
                 .help(option.help)
                 .takes_value(option.takes_argument)
                 .overrides_with(option.name)
@@ -213,6 +214,10 @@ mod tests {
             matcher.value_of(TestConfig::TEST_PARAM.name).unwrap(),
             "param1"
         );
+        assert_eq!(
+            matcher.value_of(TestConfig::TEST_PARAM2.name).unwrap(),
+            TestConfig::TEST_PARAM2.default
+        )
     }
 
     #[test]
