@@ -144,8 +144,12 @@ impl ConfigBuilder {
         // this is then passed to the actual implementation of the configuration for processing
         let mut result: HashMap<ConfigOption, Option<Vec<String>>> = HashMap::new();
         for config_option in description.options.clone() {
-
-            println!("{}: is_present(): {} - occurrences_of(): {}" , config_option.name, matcher.is_present(config_option.name) ,matcher.occurrences_of(config_option.name));
+            println!(
+                "{}: is_present(): {} - occurrences_of(): {}",
+                config_option.name,
+                matcher.is_present(config_option.name),
+                matcher.occurrences_of(config_option.name)
+            );
             if matcher.occurrences_of(config_option.name) != 0 {
                 let found_values = matcher
                     .values_of(config_option.name)
@@ -286,7 +290,7 @@ mod tests {
             takes_argument: true,
             help: "A parameter that can be specified multiple times and all values will be used.",
             documentation: "",
-            list: true
+            list: true,
         };
 
         // This function retrieves a string value that is stored for the ConfigOption that
@@ -317,7 +321,11 @@ mod tests {
         pub fn argument_was_provided(&self, key: &ConfigOption) -> bool {
             let test = self.values.get(key).unwrap();
 
-            match self.values.get(key).expect("Fatal error: key not present in HashMap, but should have been!") {
+            match self
+                .values
+                .get(key)
+                .expect("Fatal error: key not present in HashMap, but should have been!")
+            {
                 None => false,
                 Some(v) => true,
             }
@@ -335,8 +343,11 @@ mod tests {
                     TestConfig::TEST_PARAM,
                     TestConfig::TEST_PARAM2,
                     TestConfig::TEST_SWITCH,
-                    TestConfig::TEST_MULTIPLE
-                ].iter().cloned().collect(),
+                    TestConfig::TEST_MULTIPLE,
+                ]
+                .iter()
+                .cloned()
+                .collect(),
             }
         }
 
@@ -359,14 +370,19 @@ mod tests {
         let config: TestConfig = ConfigBuilder::build(command_line_args, "test").expect("test");
 
         // Check that absent parameters are reported correctly
-        assert_eq!(config.argument_was_provided(&TestConfig::TEST_SWITCH), false);
-        assert_eq!(config.argument_was_provided(&TestConfig::TEST_PARAM2), false);
+        assert_eq!(
+            config.argument_was_provided(&TestConfig::TEST_SWITCH),
+            false
+        );
+        assert_eq!(
+            config.argument_was_provided(&TestConfig::TEST_PARAM2),
+            false
+        );
 
         assert_eq!(
             config.get_first_and_only_value(&TestConfig::TEST_PARAM),
             "param1"
         );
-
     }
 
     #[test]
@@ -407,9 +423,15 @@ mod tests {
         let config: TestConfig = ConfigBuilder::build(command_line_args, "CONFIG_FILE")
             .expect("Error building config object!");
 
-        assert_eq!(config.argument_was_provided(&TestConfig::TEST_SWITCH), false);
+        assert_eq!(
+            config.argument_was_provided(&TestConfig::TEST_SWITCH),
+            false
+        );
         assert_eq!(config.argument_was_provided(&TestConfig::TEST_PARAM), false);
-        assert_eq!(config.argument_was_provided(&TestConfig::TEST_PARAM2), false);
+        assert_eq!(
+            config.argument_was_provided(&TestConfig::TEST_PARAM2),
+            false
+        );
     }
 
     #[test]
@@ -478,10 +500,13 @@ mod tests {
         ];
         let config: TestConfig =
             ConfigBuilder::build(command_line_args, "test").expect("Error building config object!");
-        let result = config.values.get(&TestConfig::TEST_MULTIPLE).expect("error getting value").clone();
+        let result = config
+            .values
+            .get(&TestConfig::TEST_MULTIPLE)
+            .expect("error getting value")
+            .clone();
         let result = result.expect("no values specified!");
         assert_eq!(result.len(), 3);
-
     }
 
     /// Helper function to convert a filename that is relative to the config crate Cargo.toml
