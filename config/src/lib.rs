@@ -25,7 +25,25 @@ mod ripgrep_config;
 /// This trait defines the behavior that all configuration classes need to
 /// provide in order for the clap matcher to be generated from the config object
 trait Configurable {
+    /// This method will be called by ConfigBuilder to retrieve an object that describes
+    /// the parameters which should be used to parse the command line
     fn get_config_description() -> Configuration;
+
+    /// The parsed command line parameters will be sent to this method
+    /// It is the responsibility of the actual implementation to parse the input data
+    /// and create a meaningful representation of the data contained in there that
+    /// users can then interact with
+    ///
+    /// * `parsed_values` The values that were parsed from the command line arguments
+    /// The keys in the HashMap will be all ConfigOptions that were returned in the
+    /// get_config_description() call.
+    ///
+    /// The value in the HashMap can have three meanings:
+    /// - None: this parameter was not specified on the command line
+    /// - Some(Vec<String>) with an empty Vector: this is a boolean parameter
+    ///   and it was present on the command line
+    /// - Some(Vec<String>) with one or more list elmements: parameter that takes
+    ///   a value and one or more values were specified
     fn parse_values(parsed_values: HashMap<ConfigOption, Option<Vec<String>>>) -> Self;
 }
 
