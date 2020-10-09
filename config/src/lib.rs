@@ -131,7 +131,11 @@ impl Hash for ConfigOption {
 struct ConfigBuilder {}
 
 impl ConfigBuilder {
-    /// The main function in
+    /// The entry point into ConfigBuilder, this method will be called by any binary (or library)
+    /// using this lib for command line parsing.
+    /// It is a typed method, with the type having to implement the Configurable trait, so the type
+    /// has to offer two methods: one to retrieve the definition of command line parameters, one to
+    /// pass back the parsed values of those parameters.
     ///
     /// * `commandline` The command line parameters to parse the configuration from (first element will be
     /// ignored, as this is the binary name
@@ -141,10 +145,10 @@ impl ConfigBuilder {
         config_file_env: &str,
     ) -> Result<T, Error> {
         // Parse commandline according to config definition
-        // -> ParsedValues
         let description = T::get_config_description();
 
-        //
+        // Use the command line parameters defined in the description to build a
+        // clap matcher object that can be used to parse the acual parameters
         let matcher = ConfigBuilder::create_matcher(&description);
 
         // Overwrite command line arguments with final arguments to parse
@@ -154,9 +158,7 @@ impl ConfigBuilder {
             ConfigBuilder::maybe_combine_arguments(matcher.clone(), commandline, config_file_env);
 
         // Parse command line
-        let test = commandline.clone().expect("ie");
-        println!("Commandline: {:?}", test);
-        let matcher = matcher.get_matches_from(commandline.expect("trnsi"));
+        let matcher = matcher.get_matches_from(commandline.expect("Error parsing commandline!"));
 
         // Convert results from command line parsing into a HashMap<ConfigOption, Vec<String>>
         // this is then passed to the actual implementation of the configuration for processing
@@ -197,7 +199,7 @@ impl ConfigBuilder {
             .about(config.about);
 
         for option in config.options.iter() {
-            let mut new_arg = Arg::with_name(option.name)
+            let new_arg = Arg::with_name(option.name)
                 .long(option.name)
                 .value_name(option.name)
                 .default_value(option.default)
@@ -337,15 +339,14 @@ mod tests {
 
         // Helper function to check whether the argument was provided on the command line
         pub fn argument_was_provided(&self, key: &ConfigOption) -> bool {
-            let test = self.values.get(key).unwrap();
-
-            match self
+            if let Some(v) = self
                 .values
                 .get(key)
                 .expect("Fatal error: key not present in HashMap, but should have been!")
             {
-                None => false,
-                Some(v) => true,
+                true
+            } else {
+                false
             }
         }
     }
