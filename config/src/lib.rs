@@ -17,6 +17,7 @@ use std::fmt::Error;
 
 use clap::{App, Arg};
 use std::collections::{HashMap, HashSet};
+use std::env;
 use std::hash::{Hash, Hasher};
 
 // Include all "stolen" ripgrep code in this module
@@ -42,7 +43,7 @@ trait Configurable {
     /// - None: this parameter was not specified on the command line
     /// - Some(Vec<String>) with an empty Vector: this is a boolean parameter
     ///   and it was present on the command line
-    /// - Some(Vec<String>) with one or more list elmements: parameter that takes
+    /// - Some(Vec<String>) with one or more list elements: parameter that takes
     ///   a value and one or more values were specified
     fn parse_values(parsed_values: HashMap<ConfigOption, Option<Vec<String>>>) -> Self;
 }
@@ -70,7 +71,9 @@ pub struct ConfigOption {
     /// The name of the option (without leading --)
     pub name: &'static str,
     /// Default value to use for the option if it is not provided
-    pub default: &'static str,
+    /// NOTE: this will be ignored if *takes_argument* is true, as
+    /// a default value for a switch does not make too much sense
+    pub default: Option<&'static str>,
     /// Whether this option has to be provided
     pub required: bool,
     /// If true the option takes a value as argument, if false
@@ -163,28 +166,18 @@ impl ConfigBuilder {
         // Convert results from command line parsing into a HashMap<ConfigOption, Vec<String>>
         // this is then passed to the actual implementation of the configuration for processing
         let mut result: HashMap<ConfigOption, Option<Vec<String>>> = HashMap::new();
+
         for config_option in description.options.clone() {
-            println!(
-                "{}: is_present(): {} - occurrences_of(): {}",
-                config_option.name,
-                matcher.is_present(config_option.name),
-                matcher.occurrences_of(config_option.name)
-            );
-            if matcher.occurrences_of(config_option.name) != 0 {
-                let found_values = matcher
-                    .values_of(config_option.name)
-                    .expect("error")
-                    .collect::<Vec<&str>>();
+            if let Some(parsed_values) = matcher.values_of(config_option.name) {
+                let parsed_values = parsed_values.collect::<Vec<&str>>();
 
                 // Convert to Vec of owned Strings, as we will want to keep these values around for
                 // the lifetime of our application
-                let found_values: Vec<String> =
-                    found_values.into_iter().map(String::from).collect();
-                result.insert(config_option, Some(found_values));
+                let parsed_values: Vec<String> =
+                    parsed_values.into_iter().map(String::from).collect();
+
+                result.insert(config_option, Some(parsed_values));
             } else {
-                // Option was not specified on the command line, so instead of adding an empty
-                // Vec we add _None_ in order to be able to distinguish between  these cases
-                // scenarios later on
                 result.insert(config_option, None);
             }
         }
@@ -199,13 +192,25 @@ impl ConfigBuilder {
             .about(config.about);
 
         for option in config.options.iter() {
-            let new_arg = Arg::with_name(option.name)
+            let mut new_arg = Arg::with_name(option.name)
                 .long(option.name)
                 .value_name(option.name)
-                .default_value(option.default)
                 .help(option.help)
                 .takes_value(option.takes_argument)
                 .required(option.required);
+
+            // Was a default value specified for this option?
+            if let Some(default_value) = &option.default {
+                // If this is an option that does not take an argument i.e. a switch
+                // we ignore any default values that were specified, as these do not really
+                // make sense for that
+                // If a value is needed in case a switch is specified then this should be handled
+                // in the implementing config
+                if option.takes_argument {
+                    new_arg = new_arg.default_value(default_value);
+                }
+            }
+
             if option.list {
                 matches = matches.arg(new_arg.multiple(true));
             } else {
@@ -251,8 +256,6 @@ impl ConfigBuilder {
         // is the name of the executable and ignored by clap during parsing
         args_from_file.insert(0, cliargs.remove(0));
         args_from_file.extend(cliargs);
-        // TODO: Convert to debug log statement
-        println!("final argv: {:?}", args_from_file);
 
         // Return combined values
         Ok(args_from_file)
@@ -266,6 +269,15 @@ mod tests {
     use crate::{ConfigBuilder, ConfigOption, Configurable, Configuration};
     use std::collections::HashMap;
     use std::env;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static COUNTER: AtomicUsize = AtomicUsize::new(1);
+
+    fn get_and_delete_env_var() -> String {
+        let name = format!("configfile-{}", COUNTER.fetch_add(1, Ordering::Relaxed));
+        env::remove_var(&name);
+        name
+    }
 
     // Define a test configuration that can be used to run a few tests
     struct TestConfig {
@@ -278,7 +290,7 @@ mod tests {
     impl TestConfig {
         pub const TEST_PARAM: ConfigOption = ConfigOption {
             name: "testparam",
-            default: "",
+            default: Some("udtarine"),
             required: false,
             takes_argument: true,
             help: "Testhelp",
@@ -287,7 +299,7 @@ mod tests {
         };
         pub const TEST_PARAM2: ConfigOption = ConfigOption {
             name: "testparam2",
-            default: "2",
+            default: None,
             required: false,
             takes_argument: true,
             help: "test2",
@@ -296,7 +308,7 @@ mod tests {
         };
         pub const TEST_SWITCH: ConfigOption = ConfigOption {
             name: "testswitch",
-            default: "",
+            default: None,
             required: false,
             takes_argument: false,
             help: "a switch that can be provided - or not",
@@ -305,7 +317,7 @@ mod tests {
         };
         pub const TEST_MULTIPLE: ConfigOption = ConfigOption {
             name: "testmultiple",
-            default: "",
+            default: Some("3"),
             required: false,
             takes_argument: true,
             help: "A parameter that can be specified multiple times and all values will be used.",
@@ -339,7 +351,7 @@ mod tests {
 
         // Helper function to check whether the argument was provided on the command line
         pub fn argument_was_provided(&self, key: &ConfigOption) -> bool {
-            if let Some(v) = self
+            if let Some(_v) = self
                 .values
                 .get(key)
                 .expect("Fatal error: key not present in HashMap, but should have been!")
@@ -381,12 +393,15 @@ mod tests {
 
     #[test]
     fn parse_single_param() {
+        let env_var_name = get_and_delete_env_var();
+
         let command_line_args: Vec<OsString> = vec![
             OsString::from("filename"),
             OsString::from("--testparam"),
             OsString::from("param1"),
         ];
-        let config: TestConfig = ConfigBuilder::build(command_line_args, "test").expect("test");
+        let config: TestConfig =
+            ConfigBuilder::build(command_line_args, &env_var_name).expect("test");
 
         // Check that absent parameters are reported correctly
         assert_eq!(
@@ -406,6 +421,7 @@ mod tests {
 
     #[test]
     fn parse_multiple_params() {
+        let env_var_name = get_and_delete_env_var();
         let command_line_args: Vec<OsString> = vec![
             OsString::from("filename"),
             OsString::from("--testswitch"),
@@ -414,8 +430,8 @@ mod tests {
             OsString::from("--testparam2"),
             OsString::from("param2"),
         ];
-        let config: TestConfig =
-            ConfigBuilder::build(command_line_args, "test").expect("Error building config object!");
+        let config: TestConfig = ConfigBuilder::build(command_line_args, &env_var_name)
+            .expect("Error building config object!");
 
         assert!(config.argument_was_provided(&TestConfig::TEST_SWITCH));
 
@@ -437,31 +453,61 @@ mod tests {
 
     #[test]
     fn test_parameters_absent() {
+        let env_var_name = get_and_delete_env_var();
+
         let command_line_args: Vec<OsString> = vec![OsString::from("filename")];
-        env::remove_var("CONFIG_FILE");
-        let config: TestConfig = ConfigBuilder::build(command_line_args, "CONFIG_FILE")
+
+        let config: TestConfig = ConfigBuilder::build(command_line_args, &env_var_name)
             .expect("Error building config object!");
 
+        // TestConfig::TestSwitch
+        // takes_argument: false
         assert_eq!(
             config.argument_was_provided(&TestConfig::TEST_SWITCH),
             false
         );
-        assert_eq!(config.argument_was_provided(&TestConfig::TEST_PARAM), false);
+
+        // TestConfig::TestParam
+        // takes_argument: true
+        // default: "udtarine"
+        // list: false
+        assert!(config.argument_was_provided(&TestConfig::TEST_PARAM), true);
+        assert_eq!(
+            config.get_first_and_only_value(&TestConfig::TEST_PARAM),
+            TestConfig::TEST_PARAM.default.expect("")
+        );
+
+        // TestConfig::TestParam2
+        // takes_argument: true
+        // no default
+        // list: false
         assert_eq!(
             config.argument_was_provided(&TestConfig::TEST_PARAM2),
             false
+        );
+
+        // TestConfig::TestMultiple
+        // takes_argument: true
+        // default: "3"
+        // list: true
+        assert!(config.argument_was_provided(&TestConfig::TEST_MULTIPLE));
+        assert_eq!(
+            config.get_first_and_only_value(&TestConfig::TEST_MULTIPLE),
+            "3"
         );
     }
 
     #[test]
     fn parse_from_file_only() {
+        let env_var_name = get_and_delete_env_var();
+
         let command_line_args: Vec<OsString> = vec![OsString::from("filename")];
 
         env::set_var(
-            "CONFIG_FILE",
+            &env_var_name,
             get_absolute_file("resources/test/config1.conf"),
         );
-        let config: TestConfig = ConfigBuilder::build(command_line_args, "CONFIG_FILE")
+        let config: TestConfig = ConfigBuilder::build(command_line_args, &env_var_name)
             .expect("Error building config object!");
 
         assert!(config.argument_was_provided(&TestConfig::TEST_PARAM));
@@ -479,6 +525,8 @@ mod tests {
     /// To ensure the file is not simply ignored a second parameter is loaded from file only.
     #[test]
     fn override_value_from_file() {
+        let env_var_name = get_and_delete_env_var();
+
         let command_line_args: Vec<OsString> = vec![
             OsString::from("filename"),
             OsString::from("--testparam"),
@@ -486,11 +534,11 @@ mod tests {
         ];
 
         env::set_var(
-            "CONFIG_FILE",
+            &env_var_name,
             get_absolute_file("resources/test/config1.conf"),
         );
 
-        let config: TestConfig = ConfigBuilder::build(command_line_args, "CONFIG_FILE")
+        let config: TestConfig = ConfigBuilder::build(command_line_args, &env_var_name)
             .expect("Error building config object!");
 
         assert!(config.argument_was_provided(&TestConfig::TEST_PARAM));
@@ -506,8 +554,11 @@ mod tests {
         );
     }
 
+    // Test whether multiple occurrences of the same parameter are parsed correctly
     #[test]
     fn test_multiple_values() {
+        let env_var_name = get_and_delete_env_var();
+
         let command_line_args: Vec<OsString> = vec![
             OsString::from("filename"),
             OsString::from("--testmultiple"),
@@ -517,8 +568,8 @@ mod tests {
             OsString::from("--testmultiple"),
             OsString::from("3"),
         ];
-        let config: TestConfig =
-            ConfigBuilder::build(command_line_args, "test").expect("Error building config object!");
+        let config: TestConfig = ConfigBuilder::build(command_line_args, &env_var_name)
+            .expect("Error building config object!");
         let result = config
             .values
             .get(&TestConfig::TEST_MULTIPLE)
@@ -526,6 +577,9 @@ mod tests {
             .clone();
         let result = result.expect("no values specified!");
         assert_eq!(result.len(), 3);
+        assert!(result.contains(&String::from("1")));
+        assert!(result.contains(&String::from("2")));
+        assert!(result.contains(&String::from("3")));
     }
 
     /// Helper function to convert a filename that is relative to the config crate Cargo.toml
