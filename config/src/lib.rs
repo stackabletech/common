@@ -13,11 +13,9 @@
 //! to parse the command line.
 //!
 use std::ffi::OsString;
-use std::fmt::Error;
 
 use clap::{App, Arg};
 use std::collections::{HashMap, HashSet};
-use std::env;
 use std::hash::{Hash, Hasher};
 
 // Include all "stolen" ripgrep code in this module
@@ -25,7 +23,7 @@ mod ripgrep_config;
 
 /// This trait defines the behavior that all configuration classes need to
 /// provide in order for the clap matcher to be generated from the config object
-trait Configurable {
+pub trait Configurable: Sized {
     /// This method will be called by ConfigBuilder to retrieve an object that describes
     /// the parameters which should be used to parse the command line
     fn get_config_description() -> Configuration;
@@ -45,7 +43,9 @@ trait Configurable {
     ///   and it was present on the command line
     /// - Some(Vec<String>) with one or more list elements: parameter that takes
     ///   a value and one or more values were specified
-    fn parse_values(parsed_values: HashMap<ConfigOption, Option<Vec<String>>>) -> Self;
+    fn parse_values(
+        parsed_values: HashMap<ConfigOption, Option<Vec<String>>>,
+    ) -> Result<Box<Self>, anyhow::Error>;
 }
 
 /// This struct describes some properties that can be set for an application as well
@@ -131,7 +131,7 @@ impl Hash for ConfigOption {
 /// This effectively means that config can be either provided on the command line, or
 /// in a file that is specified via environment variable, with options from the command
 /// line taking precedence over the config file.
-struct ConfigBuilder {}
+pub struct ConfigBuilder {}
 
 impl ConfigBuilder {
     /// The entry point into ConfigBuilder, this method will be called by any binary (or library)
@@ -146,7 +146,7 @@ impl ConfigBuilder {
     pub fn build<T: Configurable>(
         commandline: Vec<OsString>,
         config_file_env: &str,
-    ) -> Result<T, Error> {
+    ) -> Result<Box<T>, anyhow::Error> {
         // Parse commandline according to config definition
         let description = T::get_config_description();
 
@@ -158,10 +158,10 @@ impl ConfigBuilder {
         // if a config file was specified, all options from that file will be
         // prepended to the command line arguments
         let commandline =
-            ConfigBuilder::maybe_combine_arguments(matcher.clone(), commandline, config_file_env);
+            ConfigBuilder::maybe_combine_arguments(matcher.clone(), &commandline, config_file_env)?;
 
         // Parse command line
-        let matcher = matcher.get_matches_from(commandline.expect("Error parsing commandline!"));
+        let matcher = matcher.get_matches_from(commandline);
 
         // Convert results from command line parsing into a HashMap<ConfigOption, Vec<String>>
         // this is then passed to the actual implementation of the configuration for processing
@@ -182,7 +182,7 @@ impl ConfigBuilder {
             }
         }
         // Return an actual object of the configuration that is populated with appropriate values
-        Ok(T::parse_values(result))
+        T::parse_values(result)
     }
 
     // Create a clap matcher based on the ConfigOptions that were defined in the config object
@@ -222,11 +222,12 @@ impl ConfigBuilder {
 
     fn maybe_combine_arguments(
         app_matcher: App,
-        commandline: Vec<OsString>,
+        commandline: &Vec<OsString>,
         config_file_env: &str,
-    ) -> Result<Vec<OsString>, Error> {
+        //    ) -> Result<Vec<OsString>, Error> {
+    ) -> Result<Vec<OsString>, anyhow::Error> {
         // Parse provided arguments
-        let command_line_args = app_matcher.get_matches_from(&commandline);
+        let command_line_args = app_matcher.get_matches_from(commandline.clone());
 
         // If --no-config was passed on the command line, we bypass reading values from the
         // extra config file
@@ -240,7 +241,9 @@ impl ConfigBuilder {
         if args_from_file.is_empty() {
             // Return the command line arguments, as there is nothing to add to these
             // in this case
-            return Ok(commandline);
+            //return Ok(*commandline);
+            //return Ok(vec![]);
+            return Ok(commandline.clone());
         }
 
         // Build combined options from command line arguments and arguments parsed
@@ -258,6 +261,7 @@ impl ConfigBuilder {
         args_from_file.extend(cliargs);
 
         // Return combined values
+        //Ok(args_from_file)
         Ok(args_from_file)
     }
 }
@@ -384,10 +388,12 @@ mod tests {
 
         // Very simple implementation used for testing purposes only
         // Simply store the HashMap
-        fn parse_values(parsed_values: HashMap<ConfigOption, Option<Vec<String>>>) -> Self {
-            TestConfig {
+        fn parse_values(
+            parsed_values: HashMap<ConfigOption, Option<Vec<String>>>,
+        ) -> Result<Box<Self>, anyhow::Error> {
+            Ok(Box::new(TestConfig {
                 values: parsed_values,
-            }
+            }))
         }
     }
 
@@ -400,8 +406,8 @@ mod tests {
             OsString::from("--testparam"),
             OsString::from("param1"),
         ];
-        let config: TestConfig =
-            ConfigBuilder::build(command_line_args, &env_var_name).expect("test");
+        let config: TestConfig = *ConfigBuilder::build(command_line_args, &env_var_name)
+            .expect("Expected TestConfig object, but got None");
 
         // Check that absent parameters are reported correctly
         assert_eq!(
@@ -430,7 +436,7 @@ mod tests {
             OsString::from("--testparam2"),
             OsString::from("param2"),
         ];
-        let config: TestConfig = ConfigBuilder::build(command_line_args, &env_var_name)
+        let config: TestConfig = *ConfigBuilder::build(command_line_args, &env_var_name)
             .expect("Error building config object!");
 
         assert!(config.argument_was_provided(&TestConfig::TEST_SWITCH));
@@ -457,7 +463,7 @@ mod tests {
 
         let command_line_args: Vec<OsString> = vec![OsString::from("filename")];
 
-        let config: TestConfig = ConfigBuilder::build(command_line_args, &env_var_name)
+        let config: TestConfig = *ConfigBuilder::build(command_line_args, &env_var_name)
             .expect("Error building config object!");
 
         // TestConfig::TestSwitch
@@ -507,7 +513,7 @@ mod tests {
             &env_var_name,
             get_absolute_file("resources/test/config1.conf"),
         );
-        let config: TestConfig = ConfigBuilder::build(command_line_args, &env_var_name)
+        let config: TestConfig = *ConfigBuilder::build(command_line_args, &env_var_name)
             .expect("Error building config object!");
 
         assert!(config.argument_was_provided(&TestConfig::TEST_PARAM));
@@ -538,7 +544,7 @@ mod tests {
             get_absolute_file("resources/test/config1.conf"),
         );
 
-        let config: TestConfig = ConfigBuilder::build(command_line_args, &env_var_name)
+        let config: TestConfig = *ConfigBuilder::build(command_line_args, &env_var_name)
             .expect("Error building config object!");
 
         assert!(config.argument_was_provided(&TestConfig::TEST_PARAM));
@@ -568,7 +574,7 @@ mod tests {
             OsString::from("--testmultiple"),
             OsString::from("3"),
         ];
-        let config: TestConfig = ConfigBuilder::build(command_line_args, &env_var_name)
+        let config: TestConfig = *ConfigBuilder::build(command_line_args, &env_var_name)
             .expect("Error building config object!");
         let result = config
             .values
