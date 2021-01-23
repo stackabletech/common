@@ -15,6 +15,7 @@
 use std::ffi::OsString;
 
 use clap::{App, Arg};
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 
@@ -66,7 +67,7 @@ pub struct Configuration {
 }
 
 /// Represents an individual config option that the program can interpret
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq)]
 pub struct ConfigOption {
     /// The name of the option (without leading --)
     pub name: &'static str,
@@ -95,12 +96,24 @@ pub struct ConfigOption {
 // with the same name
 impl PartialEq for ConfigOption {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
+        self.name.eq(other.name)
     }
 }
 
-// Necessary to be able to use a ConfigOption as key in a HashMap
-impl Eq for ConfigOption {}
+// Implemented to allow sorted output of a list of ConfigOptions for documentation
+// purposes, this most probably serves no _real_ purpose
+impl Ord for ConfigOption {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.name.cmp(&other.name)
+    }
+}
+
+// Necessary for Ord
+impl PartialOrd for ConfigOption {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 // Necessary to be able to use a ConfigOption as key in a HashMap
 // This needs to match the equality implementation to avoid collisions/conflicts
