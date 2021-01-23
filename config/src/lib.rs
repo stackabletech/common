@@ -66,7 +66,7 @@ pub struct Configuration {
 }
 
 /// Represents an individual config option that the program can interpret
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Ord, PartialOrd)]
 pub struct ConfigOption {
     /// The name of the option (without leading --)
     pub name: &'static str,
