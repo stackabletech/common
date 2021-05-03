@@ -608,6 +608,17 @@ mod tests {
     #[test]
     fn config_option_has_default() {
         let default = ConfigOption::default();
-        assert_eq!(default, ConfigOption { name: "", default: None, required: false, takes_argument: false, help: "", documentation: "", list: false })
+        assert_eq!(
+            default,
+            ConfigOption {
+                name: "",
+                default: None,
+                required: false,
+                takes_argument: false,
+                help: "",
+                documentation: "",
+                list: false
+            }
+        )
     }
 }
