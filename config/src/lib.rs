@@ -67,7 +67,7 @@ pub struct Configuration {
 }
 
 /// Represents an individual config option that the program can interpret
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Debug, Eq, Default)]
 pub struct ConfigOption {
     /// The name of the option (without leading --)
     pub name: &'static str,
@@ -603,5 +603,22 @@ mod tests {
     /// * `filename` - A relative filename (no leading /)
     fn get_absolute_file(filename: &str) -> String {
         env!("CARGO_MANIFEST_DIR").to_owned() + "/" + filename
+    }
+
+    #[test]
+    fn config_option_has_default() {
+        let default = ConfigOption::default();
+        assert_eq!(
+            default,
+            ConfigOption {
+                name: "",
+                default: None,
+                required: false,
+                takes_argument: false,
+                help: "",
+                documentation: "",
+                list: false
+            }
+        )
     }
 }
