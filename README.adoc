@@ -1,0 +1,5 @@
+= Stackable Common
+
+This repository contains some common crates (and potentially other tools) used by Stackable.
+
+They might be suitable for reuse outside Stackable but they are not designed to do so.

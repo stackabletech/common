@@ -1,12 +1,12 @@
 [package]
-name = "stackable_config"
-version = "0.1.0-nightly"
 authors = ["Lars Francke <lars.francke@stackable.de>"]
+description = "Library to help with CLI argument parsing and definition"
 edition = "2018"
 license = "Apache-2.0"
-description = "Library to help with CLI argument parsing and definition"
+name = "stackable_config"
+version = "0.1.0-nightly"
 
 [dependencies]
+anyhow = "1"
 bstr = "0.2"
 clap = "2"
-anyhow = "1"
