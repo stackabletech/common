@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 
 use bstr::{io::BufReadExt, ByteSlice};
 
-type Result<T> = ::std::result::Result<T, Box<dyn error::Error>>;
+type Result = ::std::result::Result<(Vec<OsString>, Vec<Box<dyn Error>>), Box<dyn error::Error>>;
 
 /// Return a sequence of arguments derived from ripgrep rc configuration files.
 ///
@@ -63,7 +63,7 @@ pub fn args(environment: &str) -> Vec<OsString> {
 /// If the file could not be read, then an error is returned. If there was
 /// a problem parsing one or more lines in the file, then errors are returned
 /// for each line in addition to successfully parsed arguments.
-fn parse<P: AsRef<Path>>(path: P) -> Result<(Vec<OsString>, Vec<Box<dyn Error>>)> {
+fn parse<P: AsRef<Path>>(path: P) -> Result {
     let path = path.as_ref();
     match File::open(&path) {
         Ok(file) => parse_reader(file),
@@ -82,7 +82,7 @@ fn parse<P: AsRef<Path>>(path: P) -> Result<(Vec<OsString>, Vec<Box<dyn Error>>)
 /// If the reader could not be read, then an error is returned. If there was a
 /// problem parsing one or more lines, then errors are returned for each line
 /// in addition to successfully parsed arguments.
-fn parse_reader<R: io::Read>(rdr: R) -> Result<(Vec<OsString>, Vec<Box<dyn Error>>)> {
+fn parse_reader<R: io::Read>(rdr: R) -> Result {
     let bufrdr = io::BufReader::new(rdr);
     let (mut args, mut errs) = (vec![], vec![]);
     let mut line_number = 0;
