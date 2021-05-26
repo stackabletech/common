@@ -29,7 +29,7 @@ jobs:
         with:
           command: clean
 
-  fmt:
+  rustfmt:
     name: Run rustfmt
     runs-on: ubuntu-latest
     steps:
