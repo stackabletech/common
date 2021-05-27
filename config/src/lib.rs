@@ -235,11 +235,11 @@ impl ConfigBuilder {
 
     fn maybe_combine_arguments(
         app_matcher: App,
-        commandline: &Vec<OsString>,
+        commandline: &[OsString],
         config_file_env: &str,
     ) -> Result<Vec<OsString>, anyhow::Error> {
         // Parse provided arguments
-        let command_line_args = app_matcher.get_matches_from(commandline.clone());
+        let command_line_args = app_matcher.get_matches_from(commandline.to_owned());
 
         // If --no-config was passed on the command line, we bypass reading values from the
         // extra config file
@@ -253,7 +253,7 @@ impl ConfigBuilder {
         if args_from_file.is_empty() {
             // Return the command line arguments, as there is nothing to add to these
             // in this case
-            return Ok(commandline.clone());
+            return Ok(commandline.to_owned());
         }
 
         // Build combined options from command line arguments and arguments parsed
@@ -261,7 +261,7 @@ impl ConfigBuilder {
         // command line parameters
         // This way command line params overwrite duplicate options from the config
         // file because they are parsed later
-        let mut cliargs = commandline.clone();
+        let mut cliargs = commandline.to_owned();
 
         // Shift the first element from the actual command line args to the
         // options that where parsed from the file
@@ -364,15 +364,12 @@ mod tests {
 
         // Helper function to check whether the argument was provided on the command line
         pub fn argument_was_provided(&self, key: &ConfigOption) -> bool {
-            if let Some(_v) = self
-                .values
-                .get(key)
-                .expect("Fatal error: key not present in HashMap, but should have been!")
-            {
-                true
-            } else {
-                false
-            }
+            matches!(
+                self.values
+                    .get(key)
+                    .expect("Fatal error: key not present in HashMap, but should have been!"),
+                Some(_)
+            )
         }
     }
 
@@ -485,7 +482,11 @@ mod tests {
         // takes_argument: true
         // default: "udtarine"
         // list: false
-        assert!(config.argument_was_provided(&TestConfig::TEST_PARAM), true);
+        assert!(
+            config.argument_was_provided(&TestConfig::TEST_PARAM),
+            "{}",
+            true
+        );
         assert_eq!(
             config.get_first_and_only_value(&TestConfig::TEST_PARAM),
             TestConfig::TEST_PARAM.default.expect("")
