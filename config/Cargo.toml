@@ -7,6 +7,6 @@ name = "stackable_config"
 version = "0.1.0-nightly"
 
 [dependencies]
-anyhow = "1"
+anyhow = "1.0"
 bstr = "0.2"
-clap = "2"
+clap = "2.33"
