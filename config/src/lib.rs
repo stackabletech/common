@@ -415,13 +415,8 @@ mod tests {
         let config: TestConfig = ConfigBuilder::build(command_line_args, &env_var_name).expect("");
 
         // Check that absent parameters are reported correctly
-        assert!(
-            !config.argument_was_provided(&TestConfig::TEST_SWITCH)
-
-        );
-        assert!(
-            !config.argument_was_provided(&TestConfig::TEST_PARAM2)
-        );
+        assert!(!config.argument_was_provided(&TestConfig::TEST_SWITCH));
+        assert!(!config.argument_was_provided(&TestConfig::TEST_PARAM2));
 
         assert_eq!(
             config.get_first_and_only_value(&TestConfig::TEST_PARAM),
@@ -472,9 +467,7 @@ mod tests {
 
         // TestConfig::TestSwitch
         // takes_argument: false
-        assert!(
-            !config.argument_was_provided(&TestConfig::TEST_SWITCH)
-        );
+        assert!(!config.argument_was_provided(&TestConfig::TEST_SWITCH));
 
         // TestConfig::TestParam
         // takes_argument: true
@@ -494,9 +487,7 @@ mod tests {
         // takes_argument: true
         // no default
         // list: false
-        assert!(
-            !config.argument_was_provided(&TestConfig::TEST_PARAM2)
-        );
+        assert!(!config.argument_was_provided(&TestConfig::TEST_PARAM2));
 
         // TestConfig::TestMultiple
         // takes_argument: true
