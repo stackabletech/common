@@ -104,7 +104,7 @@ impl PartialEq for ConfigOption {
 // purposes, this most probably serves no _real_ purpose
 impl Ord for ConfigOption {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.name.cmp(&other.name)
+        self.name.cmp(other.name)
     }
 }
 
