@@ -1,0 +1,5 @@
+= Stackable Config
+
+This project provides utility functions and structs around the `clap` crate to make handling CLI arguments consistent within the Stackable platform.
+
+WARNING: We don't really use this project much because it turned out to be too limiting in use. The only project using it is the `agent`. As such this will probably be either rewritten or deleted at some point.

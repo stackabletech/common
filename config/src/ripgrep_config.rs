@@ -18,6 +18,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use bstr::{io::BufReadExt, ByteSlice};
+use log::{error, trace};
 
 type Result = ::std::result::Result<(Vec<OsString>, Vec<Box<dyn Error>>), Box<dyn error::Error>>;
 
@@ -38,16 +39,16 @@ pub fn args(environment: &str) -> Vec<OsString> {
     let (args, errs) = match parse(&config_path) {
         Ok((args, errs)) => (args, errs),
         Err(err) => {
-            println!("{}", err);
+            error!("{}", err);
             return vec![];
         }
     };
     if !errs.is_empty() {
         for err in errs {
-            println!("{}:{}", config_path.display(), err);
+            error!("{}:{}", config_path.display(), err);
         }
     }
-    println!(
+    trace!(
         "{}: arguments loaded from config file: {:?}",
         config_path.display(),
         args
