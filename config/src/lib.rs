@@ -182,12 +182,9 @@ impl ConfigBuilder {
 
         for config_option in description.options.clone() {
             if let Some(parsed_values) = matcher.values_of(config_option.name) {
-                let parsed_values = parsed_values.collect::<Vec<&str>>();
-
                 // Convert to Vec of owned Strings, as we will want to keep these values around for
                 // the lifetime of our application
-                let parsed_values: Vec<String> =
-                    parsed_values.into_iter().map(String::from).collect();
+                let parsed_values = parsed_values.map(String::from).collect();
 
                 result.insert(config_option, Some(parsed_values));
             } else {
