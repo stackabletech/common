@@ -9,5 +9,5 @@ version = "0.2.0-nightly"
 [dependencies]
 anyhow = "1.0"
 bstr = "0.2"
-clap = "2.33"
+clap = "3.0"
 log = "0.4"
